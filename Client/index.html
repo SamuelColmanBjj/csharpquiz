@@ -2,89 +2,78 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Quiz WebSocket</title>
+    <title>Quiz Interactivo</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-        #quizContainer { background: #fff; padding: 20px; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        input, button { padding: 10px; margin-top: 10px; width: 100%; box-sizing: border-box; }
-        #scores { margin-top: 20px; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        button { margin: 10px; padding: 10px 20px; font-size: 18px; }
+        #questionText { font-size: 24px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
-    <div id="quizContainer">
-        <h2>Quiz WebSocket</h2>
-        <div id="joinSection">
-            <input type="text" id="playerName" placeholder="Tu nombre"/>
-            <button onclick="joinGame()">Unirse al juego</button>
-        </div>
-
-        <div id="gameSection" style="display:none;">
-            <p id="questionText"></p>
-            <input type="text" id="answerInput" placeholder="Tu respuesta"/>
-            <button onclick="sendAnswer()">Enviar respuesta</button>
-
-            <div id="scores">
-                <h3>Puntajes:</h3>
-                <ul id="scoreList"></ul>
-            </div>
-        </div>
+    <h1>Quiz Interactivo</h1>
+    <h2 id="questionText">Esperando pregunta...</h2>
+    <div>
+        <button id="btnA">A</button>
+        <button id="btnB">B</button>
+        <button id="btnC">C</button>
+        <button id="btnD">D</button>
     </div>
+    <h3 id="scores"></h3>
 
     <script>
-        const ws = new WebSocket("ws://localhost:5000/ws");
-        let playerIdEnc = null;
-        let roomId = null;
+        const ws = new WebSocket("ws://localhost:5000/ws/");
+        let playerIdEnc = "";
 
-        ws.onopen = () => console.log("Conectado al servidor WebSocket.");
+        ws.onopen = () => {
+            console.log("Conectado al servidor");
+            const playerName = prompt("Ingresa tu nombre:");
+            ws.send(JSON.stringify({ type: "join", name: playerName }));
+        };
 
         ws.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
+            const data = JSON.parse(event.data);
+            console.log("Mensaje recibido:", data);
 
-            switch(msg.type){
-                case "room_assigned":
-                    playerIdEnc = msg.playerIdEnc;
-                    roomId = msg.roomId;
-                    console.log("Sala asignada:", roomId);
-                    document.getElementById("joinSection").style.display = "none";
-                    document.getElementById("gameSection").style.display = "block";
-                    break;
+            if (data.type === "room_assigned") {
+                playerIdEnc = data.playerIdEnc;
+                console.log("Asignado a la sala:", data.roomId);
+            }
 
-                case "question":
-                    document.getElementById("questionText").textContent = msg.text;
-                    document.getElementById("answerInput").value = "";
-                    break;
+            else if (data.type === "question") {
+                showQuestion(data.text, data.options);
+            }
 
-                case "score_update":
-                    const list = document.getElementById("scoreList");
-                    list.innerHTML = "";
-                    for (const [name, score] of Object.entries(msg.scores)) {
-                        const li = document.createElement("li");
-                        li.textContent = `${name}: ${score}`;
-                        list.appendChild(li);
-                    }
-                    break;
+            else if (data.type === "score_update") {
+                showScores(data.scores);
             }
         };
 
-        ws.onclose = () => console.log("Desconectado del servidor WebSocket.");
+        function showQuestion(text, options) {
+            document.getElementById("questionText").innerText = text;
 
-        function joinGame() {
-            const name = document.getElementById("playerName").value.trim();
-            if (!name) { alert("Escribe tu nombre"); return; }
-
-            ws.send(JSON.stringify({ type: "join", name }));
+            if (options && options.length === 4) {
+                document.getElementById("btnA").innerText = "A: " + options[0];
+                document.getElementById("btnB").innerText = "B: " + options[1];
+                document.getElementById("btnC").innerText = "C: " + options[2];
+                document.getElementById("btnD").innerText = "D: " + options[3];
+            }
         }
 
-        function sendAnswer() {
-            const answer = document.getElementById("answerInput").value.trim();
-            if (!answer) { alert("Escribe una respuesta"); return; }
-
-            ws.send(JSON.stringify({
-                type: "answer",
-                playerIdEnc,
-                answer
-            }));
+        function showScores(scores) {
+            const scoresText = Object.entries(scores)
+                .map(([name, score]) => `${name}: ${score}`)
+                .join(" | ");
+            document.getElementById("scores").innerText = "Puntajes: " + scoresText;
         }
+
+        // Enviar respuesta al servidor
+        ["btnA","btnB","btnC","btnD"].forEach(id => {
+            document.getElementById(id).addEventListener("click", () => {
+                const answer = document.getElementById(id).innerText.slice(3);
+                if (!playerIdEnc) return; // aún no tenemos ID
+                ws.send(JSON.stringify({ type: "answer", playerIdEnc: playerIdEnc, answer: answer }));
+            });
+        });
     </script>
 </body>
 </html>

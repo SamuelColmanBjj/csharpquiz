@@ -1,8 +1,16 @@
 {
   "version": 2,
-  "dgSpecHash": "ksOf9YWLx66yPtKx5A+iqawlKHl9vBrOAGdiu4eJ9k0XQoRofU4T9Lo5ECgnVvFXdgSGlF1ojRcIDVwLOIpV1A==",
+  "dgSpecHash": "gzfh+ecyKUplRkEawcrgQyPy2sOXgFiL4sHg8pCzftT4i7/A5Lpt9AnMjNCcCx43wWG2MSCHkaE7nDYp8YQSpw==",
   "success": true,
-  "projectFilePath": "/home/bazzite/Escritorio/csharpquiz/Server/Server/Server.csproj",
-  "expectedPackageFiles": [],
+  "projectFilePath": "/home/bazzite/Escritorio/csharpquiz/Server/Server.csproj",
+  "expectedPackageFiles": [
+    "/home/bazzite/.nuget/packages/microsoft.data.sqlite/9.0.10/microsoft.data.sqlite.9.0.10.nupkg.sha512",
+    "/home/bazzite/.nuget/packages/microsoft.data.sqlite.core/9.0.10/microsoft.data.sqlite.core.9.0.10.nupkg.sha512",
+    "/home/bazzite/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.10/sqlitepclraw.bundle_e_sqlite3.2.1.10.nupkg.sha512",
+    "/home/bazzite/.nuget/packages/sqlitepclraw.core/2.1.10/sqlitepclraw.core.2.1.10.nupkg.sha512",
+    "/home/bazzite/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.10/sqlitepclraw.lib.e_sqlite3.2.1.10.nupkg.sha512",
+    "/home/bazzite/.nuget/packages/sqlitepclraw.provider.e_sqlite3/2.1.10/sqlitepclraw.provider.e_sqlite3.2.1.10.nupkg.sha512",
+    "/home/bazzite/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512"
+  ],
   "logs": []
 }

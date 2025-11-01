@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/home/bazzite/Escritorio/csharpquiz/Server/Server/Server.csproj": {}
+    "/home/bazzite/Escritorio/csharpquiz/Server/Server.csproj": {}
   },
   "projects": {
-    "/home/bazzite/Escritorio/csharpquiz/Server/Server/Server.csproj": {
+    "/home/bazzite/Escritorio/csharpquiz/Server/Server.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/bazzite/Escritorio/csharpquiz/Server/Server/Server.csproj",
+        "projectUniqueName": "/home/bazzite/Escritorio/csharpquiz/Server/Server.csproj",
         "projectName": "Server",
-        "projectPath": "/home/bazzite/Escritorio/csharpquiz/Server/Server/Server.csproj",
+        "projectPath": "/home/bazzite/Escritorio/csharpquiz/Server/Server.csproj",
         "packagesPath": "/home/bazzite/.nuget/packages/",
-        "outputPath": "/home/bazzite/Escritorio/csharpquiz/Server/Server/obj/",
+        "outputPath": "/home/bazzite/Escritorio/csharpquiz/Server/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/home/bazzite/.nuget/NuGet/NuGet.Config"
@@ -37,6 +37,12 @@
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[9.0.10, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

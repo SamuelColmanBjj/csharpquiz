@@ -6,15 +6,19 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 
 class Program
 {
     static List<Room> rooms = new List<Room>();
     static List<WebSocket> clients = new List<WebSocket>();
-    static string secret = "MiSecretoSuperSeguro"; // secreto para playerIdEnc
+    static string secret = "MiSecretoSuperSeguro";
 
     static async Task Main()
     {
+        InitializeDatabase();
+        SeedDatabase();
+
         HttpListener listener = new HttpListener();
         listener.Prefixes.Add("http://localhost:5000/ws/");
         listener.Start();
@@ -42,6 +46,102 @@ class Program
         }
     }
 
+    // Inicializa la base de datos
+    static void InitializeDatabase()
+    {
+        using var connection = new SqliteConnection("Data Source=quiz.db");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS Quiz (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Title TEXT NOT NULL
+            );
+        ";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS Question (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                QuizId INTEGER NOT NULL,
+                Text TEXT NOT NULL,
+                CorrectAnswer TEXT NOT NULL,
+                Options TEXT,
+                FOREIGN KEY(QuizId) REFERENCES Quiz(Id)
+            );
+        ";
+        cmd.ExecuteNonQuery();
+
+        Console.WriteLine("Base de datos inicializada.");
+    }
+
+    // Inserta datos de prueba
+    static void SeedDatabase()
+    {
+        using var connection = new SqliteConnection("Data Source=quiz.db");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM Quiz";
+        long count = (long)cmd.ExecuteScalar()!;
+        if (count > 0) return;
+
+        cmd.CommandText = "INSERT INTO Quiz (Title) VALUES (@title)";
+        cmd.Parameters.AddWithValue("@title", "Quiz de Prueba");
+        cmd.ExecuteNonQuery();
+
+        var cmdId = connection.CreateCommand();
+        cmdId.CommandText = "SELECT last_insert_rowid();";
+        long quizId = (long)cmdId.ExecuteScalar()!;
+
+        cmd = connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO Question (QuizId, Text, CorrectAnswer, Options) VALUES (@quizId, @text, @answer, @options)";
+        cmd.Parameters.AddWithValue("@quizId", quizId);
+
+        cmd.Parameters.AddWithValue("@text", "Capital de Francia?");
+        cmd.Parameters.AddWithValue("@answer", "paris");
+        cmd.Parameters.AddWithValue("@options", "[\"paris\",\"londres\",\"berlin\",\"roma\"]");
+        cmd.ExecuteNonQuery();
+
+        cmd.Parameters["@text"].Value = "2 + 2?";
+        cmd.Parameters["@answer"].Value = "4";
+        cmd.Parameters["@options"].Value = "[\"3\",\"4\",\"5\",\"6\"]";
+        cmd.ExecuteNonQuery();
+
+        cmd.Parameters["@text"].Value = "Color del cielo?";
+        cmd.Parameters["@answer"].Value = "azul";
+        cmd.Parameters["@options"].Value = "[\"azul\",\"verde\",\"rojo\",\"amarillo\"]";
+        cmd.ExecuteNonQuery();
+
+        Console.WriteLine("Datos de prueba insertados.");
+    }
+
+    // Obtener preguntas de un quiz
+    static List<(string Text, string CorrectAnswer, string[] Options)> GetQuestions(int quizId)
+    {
+        var questions = new List<(string, string, string[])>();
+
+        using var connection = new SqliteConnection("Data Source=quiz.db");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT Text, CorrectAnswer, Options FROM Question WHERE QuizId = @quizId";
+        cmd.Parameters.AddWithValue("@quizId", quizId);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            string text = reader.GetString(0);
+            string answer = reader.GetString(1);
+            string[] options = reader.IsDBNull(2) ? new string[0] : System.Text.Json.JsonSerializer.Deserialize<string[]>(reader.GetString(2))!;
+            questions.Add((text, answer, options));
+        }
+
+        return questions;
+    }
+
+    // Asignar jugador a sala
     static Room AssignRoom(Player player)
     {
         Room room = rooms.Find(r => r.Players.Count < r.MaxPlayers);
@@ -56,11 +156,8 @@ class Program
         room.Players.Add(player);
         Console.WriteLine($"Jugador {player.Name} se unió a la sala {room.RoomId}");
 
-        // Si la sala está llena, iniciar quiz automáticamente
-        if (room.Players.Count == room.MaxPlayers)
-        {
-            _ = Task.Run(() => StartQuiz(room));
-        }
+        // Inicia el quiz automáticamente para pruebas
+        _ = Task.Run(() => StartQuiz(room));
 
         return room;
     }
@@ -68,8 +165,8 @@ class Program
     static string GeneratePlayerId(string playerName, string roomId)
     {
         var payload = $"{playerName}:{roomId}:{DateTime.UtcNow.Ticks}";
-        using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
-        var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload));
+        using var hmac = new System.Security.Cryptography.HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
         return Convert.ToBase64String(hash);
     }
 
@@ -86,7 +183,6 @@ class Program
                 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Cerrando", CancellationToken.None);
                 clients.Remove(ws);
 
-                // También eliminar de salas
                 foreach (var room in rooms)
                 {
                     var p = room.Players.Find(pl => pl.Socket == ws);
@@ -103,11 +199,11 @@ class Program
                 try
                 {
                     var data = System.Text.Json.JsonDocument.Parse(msg).RootElement;
-                    string type = data.GetProperty("type").GetString();
+                    string type = data.GetProperty("type").GetString()!;
 
                     if (type == "join")
                     {
-                        string playerName = data.GetProperty("name").GetString();
+                        string playerName = data.GetProperty("name").GetString()!;
                         string roomIdTemp = Guid.NewGuid().ToString();
                         var player = new Player
                         {
@@ -131,15 +227,15 @@ class Program
                     }
                     else if (type == "answer")
                     {
-                        string playerIdEnc = data.GetProperty("playerIdEnc").GetString();
-                        string answer = data.GetProperty("answer").GetString();
+                        string playerIdEnc = data.GetProperty("playerIdEnc").GetString()!;
+                        string answer = data.GetProperty("answer").GetString()!;
 
-                        Player player = null;
-                        Room room = null;
+                        Player player = null!;
+                        Room room = null!;
 
                         foreach (var r in rooms)
                         {
-                            player = r.Players.Find(p => p.PlayerIdEnc == playerIdEnc);
+                            player = r.Players.Find(p => p.PlayerIdEnc == playerIdEnc)!;
                             if (player != null)
                             {
                                 room = r;
@@ -149,8 +245,12 @@ class Program
 
                         if (player != null && room != null)
                         {
-                            // Validación simple: si la respuesta es "b" sumamos 1 punto
-                            if (answer.ToLower() == "b") player.Score += 1;
+                            var questions = GetQuestions(1); // Quiz de prueba
+                            var currentQuestion = questions.FirstOrDefault();
+                            if (currentQuestion.Text.ToLower() == answer.ToLower())
+                            {
+                                player.Score += 1;
+                            }
 
                             var scoreMsg = new
                             {
@@ -179,22 +279,15 @@ class Program
         }
     }
 
-    static async Task BroadcastMessage(string message, WebSocket sender)
+    static async Task SendQuestionToRoom(Room room, string questionText, string[] options)
     {
-        var msgBuffer = Encoding.UTF8.GetBytes(message);
-
-        foreach (var client in clients)
+        var question = new
         {
-            if (client.State == WebSocketState.Open && client != sender)
-            {
-                await client.SendAsync(new ArraySegment<byte>(msgBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
-            }
-        }
-    }
-
-    static async Task SendQuestionToRoom(Room room, string questionText)
-    {
-        var question = new { type = "question", text = questionText, questionId = Guid.NewGuid().ToString() };
+            type = "question",
+            text = questionText,
+            options = options,
+            questionId = Guid.NewGuid().ToString()
+        };
         string json = System.Text.Json.JsonSerializer.Serialize(question);
         byte[] buffer = Encoding.UTF8.GetBytes(json);
 
@@ -209,13 +302,11 @@ class Program
 
     static async Task StartQuiz(Room room)
     {
-        string[] questions = { "Capital de Francia?", "2 + 2?", "Color del cielo?" };
-        string[] correctAnswers = { "paris", "4", "azul" };
-
-        for (int i = 0; i < questions.Length; i++)
+        var questions = GetQuestions(1); // Quiz de prueba
+        foreach (var q in questions)
         {
-            await SendQuestionToRoom(room, questions[i]);
-            Console.WriteLine($"Pregunta enviada a sala {room.RoomId}: {questions[i]}");
+            await SendQuestionToRoom(room, q.Text, q.Options);
+            Console.WriteLine($"Pregunta enviada a sala {room.RoomId}: {q.Text}");
             await Task.Delay(15000); // 15 segundos por pregunta
         }
 
@@ -233,7 +324,7 @@ class Player
 
 class Room
 {
-    public string RoomId { get; set; }
+    public string RoomId { get; set; } = string.Empty;
     public List<Player> Players { get; set; } = new List<Player>();
     public int MaxPlayers { get; set; } = 5;
 }
