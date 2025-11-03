@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Evitar @apply directo para gradientes complejos */
+body {
+  background: linear-gradient(to bottom right, #7f00ff, #e100ff, #ff8c00);
+  min-height: 100vh;
+  color: white;
+  font-family: system-ui, sans-serif;
+}
+
+button {
+  margin: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  background-color: white;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background-color: #e2e2e2;
+  transform: scale(1.05);
+}
